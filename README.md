@@ -1,150 +1,248 @@
 # 🚢 Port Shipping Data Cleaning Pipeline
 
-A data cleaning and transformation pipeline built with Python to process raw shipping port data from Excel files into structured, ready-to-use datasets.
+> A complete **end-to-end data cleaning and transformation pipeline** for maritime shipping data.  
+> Transforms raw, messy multi-sheet Excel workbooks into clean, structured datasets ready for publishing.
 
 ---
 
-## 📋 Project Overview
+## 📋 Table of Contents
 
-This project automates the cleaning and standardization of maritime shipping data across multiple countries. It takes messy, multi-sheet Excel workbooks and transforms them into clean, structured datasets with proper port codes, country IDs, URLs, and pricing information.
-
----
-
-## 🗂️ Datasets Used
-
-| File | Description |
-|------|-------------|
-| `Countries IDs.xlsx` | Mapping of country names to their IDs |
-| `MyPoert AUG sheet1.xlsx` | Raw shipping data with multiple country sheets |
-| `Ports_ceties_codes_and_IDs.xlsx` | Port names, city names, codes, and IDs |
+- [Overview](#overview)
+- [Input vs Output](#input-vs-output)
+- [Reference Data](#reference-data)
+- [Pipeline Steps](#pipeline-steps)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [How to Run](#how-to-run)
+- [Output Files](#output-files)
 
 ---
 
-## ⚙️ What the Pipeline Does
+## Overview
 
-### 1. 📥 Data Loading
-- Reads multiple Excel files using `pandas`
-- Loads all sheets from the ports workbook dynamically
+This project automates the cleaning and enrichment of raw maritime shipping route data that arrives as messy, inconsistently formatted Excel workbooks with multiple country sheets.
 
-### 2. 🔗 Data Merging
-- Merges all country sheets into one unified DataFrame
-- Extracts three key columns: `trip`, `price offer`, `country`
-
-### 3. 🧹 Data Cleaning
-- Removes rows where both `trip` and `price offer` are missing
-- Resets index after dropping missing values
-- Strips extra whitespace from port names
-
-### 4. ✂️ Feature Extraction
-Using regex and string parsing to extract:
-- `from` — origin port
-- `to` — destination port
-- `price` — numeric price
-- `type` — shipment type
-
-### 5. 🌍 Country Standardization
-- Detects country names not matching the reference dataset
-- Corrects mismatched country names (e.g., typos, alternate spellings)
-- Merges with country IDs reference table
-
-### 6. 🔍 Fuzzy Port Matching
-- Detects port names not matching the reference port list
-- Uses `fuzzywuzzy` library to find closest matching port names
-- Automatically replaces unrecognized ports with best matches (similarity > 60%)
-
-### 7. 🔁 Port ID & Code Enrichment
-- Merges port data twice — once for origin, once for destination
-- Adds `from ID`, `from Code`, `to ID`, `to Code`
-
-### 8. 🔗 URL Generation
-- Generates unique route URLs in format: `FROMCODE-TOCODE-TYPE`
-
-### 9. 📅 Date Management
-- Adds `publish_date` (today's date)
-- Adds `expiry_date` (37 days from today)
-
-### 10. 💰 Price Formatting
-- Formats price into a multi-language JSON string supporting:
-  `en`, `ar`, `gr`, `it`, `cz`, `fr`, `sk`
-
-### 11. 📤 Export
-- Exports two clean Excel files:
-  - `port_content.xlsx` — route content data
-  - `port_templet.xlsx` — route pricing templates
+The pipeline handles:
+- **Inconsistent formatting** — mixed casing, extra spaces, split cells
+- **Typos in port names** — fixed automatically using fuzzy string matching
+- **City names instead of port names** — replaced using a reference lookup table
+- **Mismatched country names** — detected and corrected
+- **Multi-language price formatting** — prices output in 7 languages including Arabic-Indic numerals
+- **Route URL generation** — unique identifiers built from port codes
+- **Publish & expiry date assignment** — automated date stamping
 
 ---
 
-## 📦 Requirements
+## Input vs Output
 
-```bash
-pip install pandas numpy openpyxl fuzzywuzzy python-Levenshtein matplotlib
+### 📥 Input — Raw Excel Workbook (Multi-Sheet)
+
+The raw data comes as a multi-sheet Excel file. Each sheet represents a country, with trip routes and price offers written in unstructured text format.
+
+**Raw trip column example:**
+```
+FROM Frederikshavn TO Liepaja
+from Emden TO Fos-sur-Mer
+FROM Zeebrugge  TO Bensersiel
+```
+
+**Raw price offer column example:**
+```
+Trip: ONE WAY\nPrice starts from:EUR  3306\n
+Trip:ONE WAY\nprice start from :EUR  6363
+```
+
+![Input Raw Excel](images/input_multi_sheet.png)
+
+*The raw input: unstructured trip/price text across multiple country sheets*
+
+---
+
+### 📤 Output 1 — Full Clean Dataset (`full_clean_dataset.xlsx`)
+
+All sheets merged and enriched into one clean, structured table with properly parsed columns.
+
+![Output Clean Dataset](images/input_raw_excel.png)
+
+| Column | Description |
+|--------|-------------|
+| `from` | Origin port name (cleaned) |
+| `to` | Destination port name (cleaned) |
+| `price` | Numeric price extracted |
+| `type` | Trip type (`O` = one-way, `R` = round) |
+| `country id` | Country numeric ID |
+| `from Code` | Origin port 3-letter code |
+| `from ID` | Origin port numeric ID |
+| `to Code` | Destination port 3-letter code |
+| `to ID` | Destination port numeric ID |
+
+---
+
+### 📤 Output 2 — Port Content (`port_content.xlsx`)
+
+Deduplicated route table with IDs, unique URLs, and publish/expiry dates — ready for database import.
+
+![Output Port Content](images/output_port_content.png)
+![Output Port Content Extended](images/output_port_content2.png)
+
+| Column | Description |
+|--------|-------------|
+| `from ID` | Origin port numeric ID |
+| `type` | Trip type |
+| `to ID` | Destination port numeric ID |
+| `url` | Route URL slug, e.g. `CAC-ZZK-O` |
+| `puplish_date` | Today's date |
+| `expir_date` | Expiry date (37 days from today) |
+
+---
+
+### 📤 Output 3 — Pricing Template (`Port_templet.xlsx`)
+
+Per-route pricing formatted as a multilingual JSON string, covering 7 languages.
+
+![Output Port Template](images/output_port_template.png)
+
+**Price format example:**
+```json
+{"en":"3306","ar":٣٣٠٦,"gr":3306,"it":3306,"cz":3306,"fr":3306,"sk":3306}
+```
+
+Arabic prices use **Arabic-Indic numerals** (٠١٢٣٤٥٦٧٨٩) for proper localization.
+
+---
+
+## Reference Data
+
+The pipeline uses two reference Excel files to enrich and validate the data:
+
+### 🌍 Countries Reference (`Countries IDs.xlsx`)
+
+Maps country names to their numeric IDs.
+
+![Countries Reference](images/ref_countries.png)
+
+### 🏙️ Ports Reference (`Ports_ceties_codes_and_IDs.xlsx`)
+
+Maps port names, city names, 3-letter codes, and numeric IDs.
+
+![Ports Reference](images/ref_ports.png)
+
+---
+
+## Pipeline Steps
+
+```
+Raw Excel (multi-sheet)
+        │
+        ▼
+1. Load all sheets & merge into one DataFrame
+        │
+        ▼
+2. Drop fully empty rows
+        │
+        ▼
+3. Fix split price-offer cells (merge across rows)
+        │
+        ▼
+4. Extract: from / to / price / type using regex & string parsing
+        │
+        ▼
+5. Detect & fix mismatched country names → merge with Countries IDs
+        │
+        ▼
+6. Detect & fix typos in port names using fuzzy matching (fuzzywuzzy)
+        │
+        ▼
+7. Replace city names with official port names
+        │
+        ▼
+8. Merge with Ports reference → get from/to codes & IDs
+        │
+        ▼
+9. Generate route URL slug (FROMCODE-TOCODE-TYPE)
+        │
+        ▼
+10. Add publish date & expiry date (today + 37 days)
+        │
+        ▼
+11. Format prices in 7 languages (EN, AR, GR, IT, CZ, FR, SK)
+        │
+        ▼
+Output: full_clean_dataset.xlsx
+        port_content.xlsx
+        Port_templet.xlsx
 ```
 
 ---
 
-## 🚀 How to Run
-
-1. Clone the repository:
-```bash
-git clone https://github.com/your-username/port-data-cleaning.git
-cd port-data-cleaning
-```
-
-2. Place your input Excel files in the `input/` folder
-
-3. Open and run the notebook:
-```bash
-jupyter notebook
-```
-
-4. Find your output files in the `output/` folder:
-   - `port_content.xlsx`
-   - `port_templet.xlsx`
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
-port-data-cleaning/
+port-cleaning-pipeline/
+│
+├── Port_Cleaning_Pipeline.ipynb   # Main Jupyter Notebook
 │
 ├── input/
-│   ├── Countries IDs.xlsx
-│   ├── MyPoert AUG sheet1.xlsx
-│   └── Ports_ceties_codes_and_IDs.xlsx
+│   └── My port/
+│       ├── Countries IDs.xlsx             # Country name → ID reference
+│       ├── MyPoert AUG sheet1.xlsx        # Raw multi-sheet shipping data
+│       └── Ports_ceties_codes_and_IDs.xlsx # Port name/code/ID reference
 │
 ├── output/
-│   ├── port_content.xlsx
-│   └── port_templet.xlsx
+│   ├── full_clean_dataset.xlsx    # Full enriched dataset
+│   ├── port_content.xlsx          # Route content with URLs & dates
+│   └── Port_templet.xlsx          # Multilingual pricing template
 │
-├── notebook.ipynb       ← Main cleaning pipeline
-├── requirements.txt     ← Python dependencies
 └── README.md
 ```
 
 ---
 
-## 🛠️ Libraries Used
+## Requirements
+
+```bash
+pip install pandas numpy openpyxl fuzzywuzzy
+```
 
 | Library | Purpose |
 |---------|---------|
-| `pandas` | Data manipulation and Excel I/O |
+| `pandas` | Data loading, cleaning, merging |
 | `numpy` | Numerical operations |
-| `re` | Regex for string parsing |
-| `fuzzywuzzy` | Fuzzy string matching for port names |
-| `matplotlib` | Visualization |
-| `datetime` | Date generation |
+| `openpyxl` | Reading/writing Excel files |
+| `fuzzywuzzy` | Fuzzy string matching for port name correction |
+| `re` | Regex for price and route extraction |
+| `datetime` | Date stamping routes |
+
+> **Tip:** Install `python-Levenshtein` to speed up `fuzzywuzzy`:
+> ```bash
+> pip install python-Levenshtein
+> ```
 
 ---
 
-## 👤 Author
+## How to Run
 
-**Mahmoud Okasha**  
-Data Analyst  
-📍 Egypt
+1. Clone the repository and place your input Excel files in `input/My port/My port/`
+2. Open `Port_Cleaning_Pipeline.ipynb` in Jupyter Notebook or JupyterLab
+3. Run all cells (`Kernel → Restart & Run All`)
+4. Find the cleaned output files in the `output/` folder
+
+```bash
+git clone https://github.com/your-username/port-cleaning-pipeline.git
+cd port-cleaning-pipeline
+jupyter notebook Port_Cleaning_Pipeline.ipynb
+```
 
 ---
 
-## 📄 License
+## Output Files
 
-This project is licensed under the MIT License.
+| File | Rows | Description |
+|------|------|-------------|
+| `full_clean_dataset.xlsx` | 180 | Complete enriched route dataset |
+| `port_content.xlsx` | 52 | Deduplicated routes with dates & URLs |
+| `Port_templet.xlsx` | 180 | Multilingual pricing per route |
+
+---
+
+*Built with Python · pandas · fuzzywuzzy*
