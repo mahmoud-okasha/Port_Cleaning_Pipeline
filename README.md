@@ -128,7 +128,7 @@ Maps country names to their numeric IDs.
 
 Maps port names, city names, 3-letter codes, and numeric IDs.
 
-![Ports Reference](screenshots/port_&city_name.png)
+![Ports Reference](screenshots/port&city_name.png)
 
 ---
 
