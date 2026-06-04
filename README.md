@@ -23,6 +23,7 @@
 This project automates the cleaning and enrichment of raw maritime shipping route data that arrives as messy, inconsistently formatted Excel workbooks with multiple country sheets.
 
 The pipeline handles:
+
 - **Inconsistent formatting** — mixed casing, extra spaces, split cells
 - **Typos in port names** — fixed automatically using fuzzy string matching
 - **City names instead of port names** — replaced using a reference lookup table
@@ -40,6 +41,7 @@ The pipeline handles:
 The raw data comes as a multi-sheet Excel file. Each sheet represents a country, with trip routes and price offers written in unstructured text format.
 
 **Raw trip column example:**
+
 ```
 FROM Frederikshavn TO Liepaja
 from Emden TO Fos-sur-Mer
@@ -47,14 +49,15 @@ FROM Zeebrugge  TO Bensersiel
 ```
 
 **Raw price offer column example:**
+
 ```
 Trip: ONE WAY\nPrice starts from:EUR  3306\n
 Trip:ONE WAY\nprice start from :EUR  6363
 ```
 
-![Input Raw Excel](images/input_multi_sheet.png)
+![Input Raw Excel](screenshots/raw_data.png)
 
-*The raw input: unstructured trip/price text across multiple country sheets*
+_The raw input: unstructured trip/price text across multiple country sheets_
 
 ---
 
@@ -62,19 +65,19 @@ Trip:ONE WAY\nprice start from :EUR  6363
 
 All sheets merged and enriched into one clean, structured table with properly parsed columns.
 
-![Output Clean Dataset](images/input_raw_excel.png)
+![Output Clean Dataset](screenshots/full_dataset.png)
 
-| Column | Description |
-|--------|-------------|
-| `from` | Origin port name (cleaned) |
-| `to` | Destination port name (cleaned) |
-| `price` | Numeric price extracted |
-| `type` | Trip type (`O` = one-way, `R` = round) |
-| `country id` | Country numeric ID |
-| `from Code` | Origin port 3-letter code |
-| `from ID` | Origin port numeric ID |
-| `to Code` | Destination port 3-letter code |
-| `to ID` | Destination port numeric ID |
+| Column       | Description                            |
+| ------------ | -------------------------------------- |
+| `from`       | Origin port name (cleaned)             |
+| `to`         | Destination port name (cleaned)        |
+| `price`      | Numeric price extracted                |
+| `type`       | Trip type (`O` = one-way, `R` = round) |
+| `country id` | Country numeric ID                     |
+| `from Code`  | Origin port 3-letter code              |
+| `from ID`    | Origin port numeric ID                 |
+| `to Code`    | Destination port 3-letter code         |
+| `to ID`      | Destination port numeric ID            |
 
 ---
 
@@ -82,17 +85,16 @@ All sheets merged and enriched into one clean, structured table with properly pa
 
 Deduplicated route table with IDs, unique URLs, and publish/expiry dates — ready for database import.
 
-![Output Port Content](images/output_port_content.png)
-![Output Port Content Extended](images/output_port_content2.png)
+![Output Port Content](screenshots/content.png)
 
-| Column | Description |
-|--------|-------------|
-| `from ID` | Origin port numeric ID |
-| `type` | Trip type |
-| `to ID` | Destination port numeric ID |
-| `url` | Route URL slug, e.g. `CAC-ZZK-O` |
-| `puplish_date` | Today's date |
-| `expir_date` | Expiry date (37 days from today) |
+| Column         | Description                      |
+| -------------- | -------------------------------- |
+| `from ID`      | Origin port numeric ID           |
+| `type`         | Trip type                        |
+| `to ID`        | Destination port numeric ID      |
+| `url`          | Route URL slug, e.g. `CAC-ZZK-O` |
+| `puplish_date` | Today's date                     |
+| `expir_date`   | Expiry date (37 days from today) |
 
 ---
 
@@ -100,9 +102,10 @@ Deduplicated route table with IDs, unique URLs, and publish/expiry dates — rea
 
 Per-route pricing formatted as a multilingual JSON string, covering 7 languages.
 
-![Output Port Template](images/output_port_template.png)
+![Output Port Template](screenshots/template.png)
 
 **Price format example:**
+
 ```json
 {"en":"3306","ar":٣٣٠٦,"gr":3306,"it":3306,"cz":3306,"fr":3306,"sk":3306}
 ```
@@ -119,13 +122,13 @@ The pipeline uses two reference Excel files to enrich and validate the data:
 
 Maps country names to their numeric IDs.
 
-![Countries Reference](images/ref_countries.png)
+![Countries Reference](screenshots/countries.png)
 
 ### 🏙️ Ports Reference (`Ports_ceties_codes_and_IDs.xlsx`)
 
 Maps port names, city names, 3-letter codes, and numeric IDs.
 
-![Ports Reference](images/ref_ports.png)
+![Ports Reference](screenshots/port_&city_name.png)
 
 ---
 
@@ -204,16 +207,17 @@ port-cleaning-pipeline/
 pip install pandas numpy openpyxl fuzzywuzzy
 ```
 
-| Library | Purpose |
-|---------|---------|
-| `pandas` | Data loading, cleaning, merging |
-| `numpy` | Numerical operations |
-| `openpyxl` | Reading/writing Excel files |
+| Library      | Purpose                                        |
+| ------------ | ---------------------------------------------- |
+| `pandas`     | Data loading, cleaning, merging                |
+| `numpy`      | Numerical operations                           |
+| `openpyxl`   | Reading/writing Excel files                    |
 | `fuzzywuzzy` | Fuzzy string matching for port name correction |
-| `re` | Regex for price and route extraction |
-| `datetime` | Date stamping routes |
+| `re`         | Regex for price and route extraction           |
+| `datetime`   | Date stamping routes                           |
 
 > **Tip:** Install `python-Levenshtein` to speed up `fuzzywuzzy`:
+>
 > ```bash
 > pip install python-Levenshtein
 > ```
@@ -237,12 +241,12 @@ jupyter notebook Port_Cleaning_Pipeline.ipynb
 
 ## Output Files
 
-| File | Rows | Description |
-|------|------|-------------|
-| `full_clean_dataset.xlsx` | 180 | Complete enriched route dataset |
-| `port_content.xlsx` | 52 | Deduplicated routes with dates & URLs |
-| `Port_templet.xlsx` | 180 | Multilingual pricing per route |
+| File                      | Rows | Description                           |
+| ------------------------- | ---- | ------------------------------------- |
+| `full_clean_dataset.xlsx` | 180  | Complete enriched route dataset       |
+| `port_content.xlsx`       | 52   | Deduplicated routes with dates & URLs |
+| `Port_templet.xlsx`       | 180  | Multilingual pricing per route        |
 
 ---
 
-*Built with Python · pandas · fuzzywuzzy*
+_Built with Python · pandas · fuzzywuzzy_
